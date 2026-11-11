@@ -66,3 +66,21 @@ EDR and restore it when EDR/HDR is switched off (and after a compositor
 restart).  The Chromium patch here consumes `luminances.max`, i.e. the peak the
 compositor reports as currently achievable, so it follows the boosted level on
 an LCD and the pinned level on the OLED without extra logic.
+
+## Two features of this build
+
+1. **Native EDR support for the aibook panel (500 nit peak).**  The build reads
+   the real headroom the compositor advertises and, with
+   `patches/chromium-157-edr-panel-peak.patch` (in `mtgpu-kde`), takes the panel
+   peak from `luminances.max` instead of the brightness-scaled
+   `target_luminance`.  Measured: `targeted_headroom == display_headroom`, with
+   the 500 nit peak reachable.  *HDR playback is still not usable end to end on
+   this machine* — that needs the vendor to finish the GPU driver and panel
+   parameter work (HDR output path), not just the client side.
+2. **Hardware-accelerated HEVC decoding for mtgpu.**  Chromium's bundled ffmpeg
+   ships with `CONFIG_HEVC_DEMUXER/PARSER/DECODER 0` on Linux, so neither
+   Chromium nor Google Chrome can open HEVC at all on this platform (verified:
+   `DEMUXER_ERROR_NO_SUPPORTED_STREAMS`, Chrome 157 included).  Our HEVC variant
+   rebuilds that ffmpeg with the HEVC demuxer/parser enabled, so HEVC reaches the
+   Mthreads VPU VA-API decoder (measured 11x realtime on 1080p10 PQ vs 2.9x in
+   software).
