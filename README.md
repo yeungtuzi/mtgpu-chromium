@@ -103,3 +103,8 @@ at 100 % the SDR white reaches the panel peak, so a 500 nit highlight coincides
 with white and the last two bars merge; near 0 % the highlights dim too.  The
 EETF itself is fixed; the remaining dependence comes from the SDR composition
 blend.  This is close to macOS EDR behaviour and is accepted for now.
+
+**Recommended brightness for HDR playback: 40-50 % (~200-250 nit SDR white).**
+Below that the highlights look dim; above it the 500 nit bar climbs into the
+1000 nit bar and they merge near 100 %.  This is the known brightness dependence
+described above, not intended behaviour.
