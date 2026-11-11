@@ -51,3 +51,18 @@ mtgpu-chromium https://example.com
   Debian sysroot, which has no Qt6.  File dialogs fall back to xdg-desktop-portal.
 - Screenshots of HDR video come out black (hardware overlay planes are not
   captured); that is a capture limitation, not an EDR failure.
+
+## Hardware scope
+
+This build was validated on the **aibook OLED panel** (no backlight): the
+compositor can pin the panel to full drive for free, keep the 500 nit peak
+available and move only the SDR white point (200 nit at 100 %, 83 nit at 40 %),
+so headroom is 2.5–6.0 and EDR always reaches the panel peak.
+
+On a backlit LCD the equivalent setup has to **boost the backlight to maximum
+while EDR/HDR is active**, which measurably increases power draw and battery
+wear.  Such an implementation must save the user's backlight level on entering
+EDR and restore it when EDR/HDR is switched off (and after a compositor
+restart).  The Chromium patch here consumes `luminances.max`, i.e. the peak the
+compositor reports as currently achievable, so it follows the boosted level on
+an LCD and the pinned level on the OLED without extra logic.
