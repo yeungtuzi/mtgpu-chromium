@@ -87,8 +87,19 @@ an LCD and the pinned level on the OLED without extra logic.
 
 ### Highlight roll-off (BT.2390)
 
-The compositor advertises a 500 nit peak and tone maps HDR1000 content into it
-with an ITU-R BT.2390 EETF (129-entry PQ lookup table), so 500 nit and 1000 nit
-content stay distinguishable instead of both clipping at the panel peak
-(500 nit -> ~338 nit, 1000 nit -> 500 nit). SDR white still follows the
-brightness slider; the HDR mapping does not.
+The compositor advertises a **fixed 1000 nit HDR target** to clients (independent
+of the brightness slider) and renders into the real 500 nit panel peak with an
+ITU-R BT.2390 EETF (129-entry PQ lookup table).  500 nit content maps to ~338 nit
+and 1000 nit content to 500 nit, so the top two bars stay distinguishable instead
+of both clipping.
+
+Verified in the self-built Chromium with `hdr-bars-vp9.webm`: Chromium reports
+headroom 1.00 at 100 % and 2.30 at 40 % (both = the same 1000 nit target), and
+KWin's video pipeline logs `tonemap=1 maxWhite=1000 maxOut=500` in both cases;
+the four bars are distinct around 50 % brightness.
+
+Known limitation: the HDR clip still follows the brightness slider somewhat --
+at 100 % the SDR white reaches the panel peak, so a 500 nit highlight coincides
+with white and the last two bars merge; near 0 % the highlights dim too.  The
+EETF itself is fixed; the remaining dependence comes from the SDR composition
+blend.  This is close to macOS EDR behaviour and is accepted for now.
