@@ -84,3 +84,11 @@ an LCD and the pinned level on the OLED without extra logic.
    rebuilds that ffmpeg with the HEVC demuxer/parser enabled, so HEVC reaches the
    Mthreads VPU VA-API decoder (measured 11x realtime on 1080p10 PQ vs 2.9x in
    software).
+
+### Highlight roll-off (BT.2390)
+
+The compositor advertises a 500 nit peak and tone maps HDR1000 content into it
+with an ITU-R BT.2390 EETF (129-entry PQ lookup table), so 500 nit and 1000 nit
+content stay distinguishable instead of both clipping at the panel peak
+(500 nit -> ~338 nit, 1000 nit -> 500 nit). SDR white still follows the
+brightness slider; the HDR mapping does not.
