@@ -7,15 +7,15 @@
 
 | # | 区别 | 说明 |
 |---|---|---|
-| 1 | **mtgpu 硬件解码** | 用 M1000 的 VPU 解码视频，CPU 占用大幅下降。已验证 H.264 / HEVC / VP9 / AV1；AVS2 按厂商文档支持（8/10-bit、8K）。**预装 Chrome 在 Linux 上根本没有 HEVC 解复用器**，B 站这类 HEVC HDR 内容无法播放。本构建默认即走硬解，无需用户加 flag。 |
+| 1 | **mtgpu 硬件解码** | 用 M1000 的 VPU 解码视频，CPU 占用大幅下降。已验证 H.264 / HEVC / VP9 / AV1；AVS2 按厂商文档支持（8/10-bit、8K）。**预装 Chrome 播放 HEVC（如 B 站 HDR）时走的是软解**——能放，但 CPU 占用高、风扇明显；本构建改为走 VPU 硬解，默认开启，无需用户加 flag。 |
 | 2 | **EDR（增强动态范围）** | 配合 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 的 KWin 覆盖包，在 AIBOOK 的 OLED 面板上把 **HDR1000 映射到 TrueBlack HDR500**（BT.2390 EETF，129 点 PQ LUT）：500 nit 内容映射到约 338 nit，1000 nit 内容到 500 nit，高光不再一刀切。**本地 HDR 视频与 B 站 HDR 视频播放正常。** |
 | 3 | **完全去除 Google 功能的版本** | 基于 [ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium) 补丁集构建的去 Google 变体（无 Google 服务、无 Safe Browsing 上报、无 RLZ、无 Google API keys），以独立包/二进制发布，不影响系统 Chrome。 |
 | 4 | **使用本地工具链从头编译** | 不是复用上游预编译产物，而是本机从源码完整编译：clang 21.1.8（`/usr/lib/llvm-21`，`mtgpu_legacy_clang=true`）+ rustc 1.100.0-nightly（Chromium 固定版本，由 [mtgpu-rust](https://github.com/yeungtuzi/mtgpu-rust) 构建提供，见 `third_party/rust-toolchain`）；另备有 [mtgpu-clang](https://github.com/yeungtuzi/mtgpu-clang)（clang 24）可切换。 |
 
 ## 其他区别（补充）
 
-- **HEVC 解复用补丁**：本构建的 ffmpeg 打开了 `CONFIG_HEVC_DEMUXER`（并加入 `libavformat/hevc.c`、`hevcdec.c`）；
-  上游 Chromium/Chrome 的 Linux 构建把它关掉了。这是"能播 HEVC"的前提，也是硬解能生效的入口。
+- **HEVC 解复用补丁**：本构建使用的 ffmpeg 配置里 `CONFIG_HEVC_DEMUXER` 默认为关闭，我们把它打开（并加入 `libavformat/hevc.c`、`hevcdec.c`），
+  否则硬解没有可用的解复用入口。（预装 Chrome 的二进制自带 HEVC 解复用，所以它能软解播放。）
 - **默认启用 VA-API 硬解并跳过驱动白名单**：Chromium 的 VA-API 解码默认面向 Intel 驱动，
   MTT 驱动不在白名单内；本构建默认走 `VaapiVideoDecoder + VaapiIgnoreDriverChecks`，
   开箱即用，不需要用户记命令行参数。
@@ -101,8 +101,9 @@ Chromium 157.0.8103.38 built from source for the M1000 (aarch64, KWin Wayland),
 adding what the stock Google Chrome Linux build lacks:
 
 1. **mtgpu hardware decode** — H.264 / HEVC / VP9 / AV1 verified on the VPU
-   (AVS2 per vendor docs), enabled by default. Stock Chrome has no HEVC demuxer
-   at all on Linux, so Bilibili-style HEVC HDR cannot play there.
+   (AVS2 per vendor docs), enabled by default. Stock Chrome *can* play HEVC
+   (e.g. Bilibili HDR) but does so in software, burning CPU and spinning the
+   fan; this build routes it through the VPU instead.
 2. **EDR** — with the [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) KWin
    overlay it maps HDR1000 onto the AIBOOK OLED's TrueBlack HDR500 peak
    (BT.2390 EETF, 129-entry PQ LUT); local and Bilibili HDR playback work.
