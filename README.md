@@ -125,3 +125,25 @@ Verified on the M1000 (`mthreads-gmi -q`, `Utilization -> Decoder`):
 
 So on Linux the VA-API decoder is gated behind those two features; the
 `mtgpu-chromium` launcher/desktop entry must pass them for HEVC to work.
+
+### Hardware decode capabilities (M1000)
+
+Vendor documentation (Moore Threads Smart Media) advertises decode of
+**H.264/AVC, HEVC, AV1, VP9, AVS2** (8/10-bit, up to 8K) and encode of
+**AV1/H.264/HEVC**.  Verified on this machine:
+
+| codec | driver declares vaapi | mpv `Using hardware decoding (vaapi)` | Chrome VPU peak |
+|---|---|---|---|
+| H.264 | yes | yes | 7.2 % |
+| HEVC | yes | yes | 5.5 % |
+| VP9 | yes | yes | 3.3 % |
+| AV1 | yes | yes | 3.4 % |
+| AVS2 | yes (docs, 8/10-bit 8K) | not tested (no sample) | -- |
+
+Measured cost difference for 1080p H.264 in Chrome: **3.8 % CPU with the VPU
+versus 85.8 % CPU in software** (~22x).
+
+Chromium only reaches the VPU with
+`--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks`; without them the
+decoder utilisation stays at 0 %.  The shipped launcher/desktop entry therefore
+passes both flags, so hardware decode is the default for `mtgpu-chromium`.
