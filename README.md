@@ -1,151 +1,104 @@
 # mtgpu-chromium
 
-Chromium **157.0.8103.38** (release channel) built from source on the M1000
-laptop (aarch64, 12× Cortex-A78, KWin Wayland), with EDR/HDR verified against
-KWin's real `wp_color_management_v1` headroom.
+在 AIBOOK（MTT M1000 / aarch64 / KWin Wayland）上从源码构建的 **Chromium 157.0.8103.38**，
+针对 mtgpu 的硬件解码与 EDR（增强动态范围）做了验证和补强。
 
-## Why this build exists
+## 与预装 Google Chrome 的主要区别
 
-The pre-installed Google Chrome is the same upstream version, but on this
-machine HDR playback was reported as not showing real EDR.  This project builds
-the same source locally so the composition path can be instrumented and
-verified, and ships it as a separate package that cannot disturb the system
-browser.
+| # | 区别 | 说明 |
+|---|---|---|
+| 1 | **mtgpu 硬件解码** | 用 M1000 的 VPU 解码视频，CPU 占用大幅下降。已验证 H.264 / HEVC / VP9 / AV1；AVS2 按厂商文档支持（8/10-bit、8K）。**预装 Chrome 在 Linux 上根本没有 HEVC 解复用器**，B 站这类 HEVC HDR 内容无法播放。本构建默认即走硬解，无需用户加 flag。 |
+| 2 | **EDR（增强动态范围）** | 配合 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 的 KWin 覆盖包，在 AIBOOK 的 OLED 面板上把 **HDR1000 映射到 TrueBlack HDR500**（BT.2390 EETF，129 点 PQ LUT）：500 nit 内容映射到约 338 nit，1000 nit 内容到 500 nit，高光不再一刀切。**本地 HDR 视频与 B 站 HDR 视频播放正常。** |
+| 3 | **完全去除 Google 功能的版本** | 基于 [ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium) 补丁集构建的去 Google 变体（无 Google 服务、无 Safe Browsing 上报、无 RLZ、无 Google API keys），以独立包/二进制发布，不影响系统 Chrome。 |
 
-## What was verified
+## 其他区别（补充）
 
-With `CHROME_EDR_DEBUG=1` (a diagnostics patch in
-`mtgpu-kde/tools/chromium-hdr`):
+- **HEVC 解复用补丁**：本构建的 ffmpeg 打开了 `CONFIG_HEVC_DEMUXER`（并加入 `libavformat/hevc.c`、`hevcdec.c`）；
+  上游 Chromium/Chrome 的 Linux 构建把它关掉了。这是"能播 HEVC"的前提，也是硬解能生效的入口。
+- **默认启用 VA-API 硬解并跳过驱动白名单**：Chromium 的 VA-API 解码默认面向 Intel 驱动，
+  MTT 驱动不在白名单内；本构建默认走 `VaapiVideoDecoder + VaapiIgnoreDriverChecks`，
+  开箱即用，不需要用户记命令行参数。
+- **EDR 诊断开关**：`CHROME_EDR_DEBUG=1` 会打印 `[EDR]` 系列日志（headroom、quad 色彩空间、
+  `is_video`、`targeted_headroom` 与 `display_headroom` 是否一致），便于确认 EDR 是否真正生效。
+- **与 KWin 补丁配套**：EDR 不是单靠浏览器实现的——需要 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde)
+  中的 KWin 覆盖包（固定 1000 nit 客户端目标、参考白随亮度条、BT.2390 LUT），两者版本要配套。
+- **独立安装，不与系统 Chrome 冲突**：装在 `/opt/mtgpu-chromium`，`/usr/bin/mtgpu-chromium`
+  启动器 + 桌面项；系统 `google-chrome-stable` 保持不变。
+- **可复现构建**：源码 commit、工具链（clang 24 / rust 1.100）、gn args 与补丁均记录在仓库中。
+- **无 Google 更新组件常驻**：单一 release 构建，不跑 Google 更新服务，更新靠包管理器手动完成。
+- **不含 Widevine DRM**：Netflix、Spotify 等受 DRM 保护的内容无法直接播放（可另行安装 Widevine CDM）。
+- **不含 Google API keys**：依赖 Google 服务的功能（定位、部分账号相关能力）会降级或不可用；
+  去 Google 变体则连内置的 Google 服务入口一并移除。
 
-```
-[EDR] swap headroom=3.83197 sdr_nits=83
-[EDR] quad src={primaries:BT2020, transfer:PQ (white:203 nits)} is_video=1
-      disp_headroom=3.83197  targeted_headroom=3.83197
-```
-
-Chromium 157 already consumes the compositor's headroom
-(`targeted == display`), so the historical "Chromium uses a hard-coded
-headroom" problem no longer exists in this version.  What this package adds is
-the verified build, the diagnostics, and a launcher that always runs on
-Wayland (where `wp_color_management_v1` exists).
-
-## Install
+## 安装
 
 ```sh
 sudo apt install ./mtgpu-chromium_157.0.8103.38_arm64.deb
 mtgpu-chromium https://example.com
 ```
 
-- Installs under `/opt/mtgpu-chromium`, launcher `/usr/bin/mtgpu-chromium`,
-  desktop entry `Chromium (mtgpu, HDR)`.
-- Does not modify or conflict with `google-chrome-stable` at runtime; the
-  package declares `Conflicts:` only to prevent file collisions if the
-  distribution's package is ever repackaged into `/opt`.
+- 安装路径 `/opt/mtgpu-chromium`，启动器 `/usr/bin/mtgpu-chromium`，桌面项 `Chromium (mtgpu, HDR)`。
+- 运行时不修改、不依赖 `google-chrome-stable`。
 
-## Caveats
+## 实测数据
 
-- **HEVC is not decoded** by this build (`ffmpeg_branding="Chrome"`); `hdr-bars.mp4`
-  (HEVC) therefore does not play.  Use a VP9/AV1 PQ clip, e.g.
-  `ffmpeg -i hdr-bars.mp4 -c:v libvpx-vp9 -pix_fmt yuv420p10le -color_trc smpte2084 ...`.
-- Qt file dialogs are disabled (`use_qt6=false`): Chromium only takes Qt from its
-  Debian sysroot, which has no Qt6.  File dialogs fall back to xdg-desktop-portal.
-- Screenshots of HDR video come out black (hardware overlay planes are not
-  captured); that is a capture limitation, not an EDR failure.
+硬解（`mthreads-gmi -q` 的 `Utilization → Decoder`，长采样取峰值）：
 
-## Hardware scope
-
-This build was validated on the **aibook OLED panel** (no backlight): the
-compositor can pin the panel to full drive for free, keep the 500 nit peak
-available and move only the SDR white point (200 nit at 100 %, 83 nit at 40 %),
-so headroom is 2.5–6.0 and EDR always reaches the panel peak.
-
-On a backlit LCD the equivalent setup has to **boost the backlight to maximum
-while EDR/HDR is active**, which measurably increases power draw and battery
-wear.  Such an implementation must save the user's backlight level on entering
-EDR and restore it when EDR/HDR is switched off (and after a compositor
-restart).  The Chromium patch here consumes `luminances.max`, i.e. the peak the
-compositor reports as currently achievable, so it follows the boosted level on
-an LCD and the pinned level on the OLED without extra logic.
-
-## Two features of this build
-
-1. **Native EDR support for the aibook panel (500 nit peak).**  The build reads
-   the real headroom the compositor advertises and, with
-   `patches/chromium-157-edr-panel-peak.patch` (in `mtgpu-kde`), takes the panel
-   peak from `luminances.max` instead of the brightness-scaled
-   `target_luminance`.  Measured: `targeted_headroom == display_headroom`, with
-   the 500 nit peak reachable.  *HDR playback is still not usable end to end on
-   this machine* — that needs the vendor to finish the GPU driver and panel
-   parameter work (HDR output path), not just the client side.
-2. **Hardware-accelerated HEVC decoding for mtgpu.**  Chromium's bundled ffmpeg
-   ships with `CONFIG_HEVC_DEMUXER/PARSER/DECODER 0` on Linux, so neither
-   Chromium nor Google Chrome can open HEVC at all on this platform (verified:
-   `DEMUXER_ERROR_NO_SUPPORTED_STREAMS`, Chrome 157 included).  Our HEVC variant
-   rebuilds that ffmpeg with the HEVC demuxer/parser enabled, so HEVC reaches the
-   Mthreads VPU VA-API decoder (measured 11x realtime on 1080p10 PQ vs 2.9x in
-   software).
-
-### Highlight roll-off (BT.2390)
-
-The compositor advertises a **fixed 1000 nit HDR target** to clients (independent
-of the brightness slider) and renders into the real 500 nit panel peak with an
-ITU-R BT.2390 EETF (129-entry PQ lookup table).  500 nit content maps to ~338 nit
-and 1000 nit content to 500 nit, so the top two bars stay distinguishable instead
-of both clipping.
-
-Verified in the self-built Chromium with `hdr-bars-vp9.webm`: Chromium reports
-headroom 1.00 at 100 % and 2.30 at 40 % (both = the same 1000 nit target), and
-KWin's video pipeline logs `tonemap=1 maxWhite=1000 maxOut=500` in both cases;
-the four bars are distinct around 50 % brightness.
-
-Known limitation: the HDR clip still follows the brightness slider somewhat --
-at 100 % the SDR white reaches the panel peak, so a 500 nit highlight coincides
-with white and the last two bars merge; near 0 % the highlights dim too.  The
-EETF itself is fixed; the remaining dependence comes from the SDR composition
-blend.  This is close to macOS EDR behaviour and is accepted for now.
-
-**Recommended brightness for HDR playback: 40-50 % (~200-250 nit SDR white).**
-Below that the highlights look dim; above it the 500 nit bar climbs into the
-1000 nit bar and they merge near 100 %.  This is the known brightness dependence
-described above, not intended behaviour.
-
-### HEVC hardware decode: verified
-
-The bundled ffmpeg is rebuilt with `CONFIG_HEVC_DEMUXER=1` plus
-`libavformat/hevc.c` / `hevcdec.c`; the parser used for the VA-API path is
-Chromium's own `media::H265Parser`, so `CONFIG_HEVC_PARSER`/`CONFIG_HEVC_DECODER`
-stay off.
-
-Verified on the M1000 (`mthreads-gmi -q`, `Utilization -> Decoder`):
-
-| flags | decoder util | playback |
-|---|---|---|
-| default | 0.0 % | no decoder available (build has no software HEVC) |
-| `--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks` | **3.2-6.3 %** | HEVC plays, VPU active |
-
-So on Linux the VA-API decoder is gated behind those two features; the
-`mtgpu-chromium` launcher/desktop entry must pass them for HEVC to work.
-
-### Hardware decode capabilities (M1000)
-
-Vendor documentation (Moore Threads Smart Media) advertises decode of
-**H.264/AVC, HEVC, AV1, VP9, AVS2** (8/10-bit, up to 8K) and encode of
-**AV1/H.264/HEVC**.  Verified on this machine:
-
-| codec | driver declares vaapi | mpv `Using hardware decoding (vaapi)` | Chrome VPU peak |
+| 编码 | 驱动声明 VA-API | mpv `Using hardware decoding (vaapi)` | Chrome 中 VPU 峰值 |
 |---|---|---|---|
-| H.264 | yes | yes | 7.2 % |
-| HEVC | yes | yes | 5.5 % |
-| VP9 | yes | yes | 3.3 % |
-| AV1 | yes | yes | 3.4 % |
-| AVS2 | yes (docs, 8/10-bit 8K) | not tested (no sample) | -- |
+| H.264 | ✅ | ✅ | 7.2% |
+| HEVC | ✅ | ✅ | 5.5% |
+| VP9 | ✅ | ✅ | 3.3% |
+| AV1 | ✅ | ✅ | 3.4% |
+| AVS2 | ✅（厂商文档） | 无样本未测 | — |
 
-Measured cost difference for 1080p H.264 in Chrome: **3.8 % CPU with the VPU
-versus 85.8 % CPU in software** (~22x).
+1080p H.264 对比：**硬解时 Chrome 总 CPU ≈ 3.8%**，软解 ≈ **85.8%**（约 22 倍差距）。
 
-Hardware decode is **on by default** in this build: a 30 s soak of 1080p H.264
-shows VPU utilisation 6.3 % with no flags at all (10/10 samples non-zero), and
-`--disable-accelerated-video-decode` drops it to software (85.8 % CPU vs 3.8 %
-with the VPU).  Earlier "0 %" readings were video-start timing artefacts, not a
-missing feature.  `--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks`
-is harmless but not required.
+EDR（`CHROME_EDR_DEBUG=1`）：
+
+```
+[EDR] wp_image_description sdr=178 target_max=1000
+[EDR] swap headroom=1.49 sdr_nits=178        # log2，即 2.8x
+[EDR] quad src={primaries:BT2020, transfer:PQ (white:203 nits)} is_video=1
+```
+
+KWin 侧（mtgpu-kde 补丁）在 100% 与 40% 亮度下都保持 `tonemap=1 maxWhite=1000 maxOut=500`。
+
+## 已知限制
+
+- **HDR 视频亮度仍会部分跟随亮度条**：100% 时 SDR 白到达面板峰值，500 nit 高光与白点重合，
+  最后两档会合流；接近 0% 时高光也会变暗。EETF 本身固定，剩余依赖来自 SDR 合成混合阶段。
+  **推荐观看 HDR 时把亮度调到 40–50%（约 200–250 nit SDR 白）**，该区间四档区分最清楚。
+- Qt 文件对话框走 xdg-desktop-portal（构建时 `use_qt6=false`）。
+- 对 HDR 视频截图会全黑（硬件叠加层不参与截屏），是采集限制，不是 EDR 失效。
+- 真正的 HDR 输出模式（`highDynamicRange: true`）仍依赖厂商完善 GPU 驱动与面板参数；
+  当前 EDR 是在 SDR 输出模式下用人工 headroom 实现。
+
+## 构建
+
+见 [mtgpu-kde 的 TOOLCHAIN.md](https://github.com/yeungtuzi/mtgpu-kde/blob/main/tools/chromium-hdr/TOOLCHAIN.md)：
+`gn gen out/hdr` + `ninja -j12 chrome`；ffmpeg 的 HEVC demuxer 开关在
+`third_party/ffmpeg/chromium/config/Chrome/linux/arm64/config_components.h`。
+
+---
+
+## English summary
+
+Chromium 157.0.8103.38 built from source for the M1000 (aarch64, KWin Wayland),
+adding what the stock Google Chrome Linux build lacks:
+
+1. **mtgpu hardware decode** — H.264 / HEVC / VP9 / AV1 verified on the VPU
+   (AVS2 per vendor docs), enabled by default. Stock Chrome has no HEVC demuxer
+   at all on Linux, so Bilibili-style HEVC HDR cannot play there.
+2. **EDR** — with the [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) KWin
+   overlay it maps HDR1000 onto the AIBOOK OLED's TrueBlack HDR500 peak
+   (BT.2390 EETF, 129-entry PQ LUT); local and Bilibili HDR playback work.
+3. **De-Googled variant** — built from the
+   [ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium)
+   patch set, shipped as a separate package.
+
+Also: HEVC demuxer patch, VA-API enabled by default with driver-check bypass,
+`CHROME_EDR_DEBUG=1` diagnostics, isolated install under `/opt/mtgpu-chromium`.
+
+Known limitation: HDR brightness still partly follows the brightness slider;
+40-50 % is the recommended window for HDR viewing.
