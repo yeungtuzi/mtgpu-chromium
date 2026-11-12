@@ -10,6 +10,7 @@
 | 1 | **mtgpu 硬件解码** | 用 M1000 的 VPU 解码视频，CPU 占用大幅下降。已验证 H.264 / HEVC / VP9 / AV1；AVS2 按厂商文档支持（8/10-bit、8K）。**预装 Chrome 在 Linux 上根本没有 HEVC 解复用器**，B 站这类 HEVC HDR 内容无法播放。本构建默认即走硬解，无需用户加 flag。 |
 | 2 | **EDR（增强动态范围）** | 配合 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 的 KWin 覆盖包，在 AIBOOK 的 OLED 面板上把 **HDR1000 映射到 TrueBlack HDR500**（BT.2390 EETF，129 点 PQ LUT）：500 nit 内容映射到约 338 nit，1000 nit 内容到 500 nit，高光不再一刀切。**本地 HDR 视频与 B 站 HDR 视频播放正常。** |
 | 3 | **完全去除 Google 功能的版本** | 基于 [ungoogled-chromium](https://github.com/ungoogled-software/ungoogled-chromium) 补丁集构建的去 Google 变体（无 Google 服务、无 Safe Browsing 上报、无 RLZ、无 Google API keys），以独立包/二进制发布，不影响系统 Chrome。 |
+| 4 | **使用本地工具链从头编译** | 不是复用上游预编译产物，而是本机从源码完整编译：clang 21.1.8（`/usr/lib/llvm-21`，`mtgpu_legacy_clang=true`）+ rustc 1.100.0-nightly（Chromium 固定版本，由 [mtgpu-rust](https://github.com/yeungtuzi/mtgpu-rust) 构建提供，见 `third_party/rust-toolchain`）；另备有 [mtgpu-clang](https://github.com/yeungtuzi/mtgpu-clang)（clang 24）可切换。 |
 
 ## 其他区别（补充）
 
@@ -24,7 +25,7 @@
   中的 KWin 覆盖包（固定 1000 nit 客户端目标、参考白随亮度条、BT.2390 LUT），两者版本要配套。
 - **独立安装，不与系统 Chrome 冲突**：装在 `/opt/mtgpu-chromium`，`/usr/bin/mtgpu-chromium`
   启动器 + 桌面项；系统 `google-chrome-stable` 保持不变。
-- **可复现构建**：源码 commit、工具链（clang 24 / rust 1.100）、gn args 与补丁均记录在仓库中。
+- **可复现构建**：源码 commit、工具链（clang 21.1.8 + rustc 1.100.0-nightly）、gn args 与补丁均记录在仓库中。
 - **无 Google 更新组件常驻**：单一 release 构建，不跑 Google 更新服务，更新靠包管理器手动完成。
 - **不含 Widevine DRM**：Netflix、Spotify 等受 DRM 保护的内容无法直接播放（可另行安装 Widevine CDM）。
 - **不含 Google API keys**：依赖 Google 服务的功能（定位、部分账号相关能力）会降级或不可用；
