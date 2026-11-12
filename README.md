@@ -143,7 +143,9 @@ Vendor documentation (Moore Threads Smart Media) advertises decode of
 Measured cost difference for 1080p H.264 in Chrome: **3.8 % CPU with the VPU
 versus 85.8 % CPU in software** (~22x).
 
-Chromium only reaches the VPU with
-`--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks`; without them the
-decoder utilisation stays at 0 %.  The shipped launcher/desktop entry therefore
-passes both flags, so hardware decode is the default for `mtgpu-chromium`.
+Hardware decode is **on by default** in this build: a 30 s soak of 1080p H.264
+shows VPU utilisation 6.3 % with no flags at all (10/10 samples non-zero), and
+`--disable-accelerated-video-decode` drops it to software (85.8 % CPU vs 3.8 %
+with the VPU).  Earlier "0 %" readings were video-start timing artefacts, not a
+missing feature.  `--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks`
+is harmless but not required.
