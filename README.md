@@ -1,5 +1,13 @@
 # mtgpu-chromium
 
+> ⚠️ **必须与 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 配合使用。**
+> EDR/HDR 依赖 `mtgpu-kde` 提供的 KWin 覆盖包（参考白策略、固定 1000 nit 客户端目标、BT.2390 滚降 LUT），
+> 只装本项目的 Chromium 不会得到 EDR 效果。
+>
+> ⚠️ **仅在 AIBOOK 上验证**（MTT M1000 + OLED 面板 + KWin Wayland）。其他机型/面板未测试，
+> 硬解与 EDR 行为可能不同（LCD 需要额外的背光 boost/恢复逻辑）。
+
+
 在 AIBOOK（MTT M1000 / aarch64 / KWin Wayland）上从源码构建的 **Chromium 157.0.8103.38**，
 针对 mtgpu 的硬件解码与 EDR（增强动态范围）做了验证和补强。
 
