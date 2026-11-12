@@ -108,3 +108,20 @@ blend.  This is close to macOS EDR behaviour and is accepted for now.
 Below that the highlights look dim; above it the 500 nit bar climbs into the
 1000 nit bar and they merge near 100 %.  This is the known brightness dependence
 described above, not intended behaviour.
+
+### HEVC hardware decode: verified
+
+The bundled ffmpeg is rebuilt with `CONFIG_HEVC_DEMUXER=1` plus
+`libavformat/hevc.c` / `hevcdec.c`; the parser used for the VA-API path is
+Chromium's own `media::H265Parser`, so `CONFIG_HEVC_PARSER`/`CONFIG_HEVC_DECODER`
+stay off.
+
+Verified on the M1000 (`mthreads-gmi -q`, `Utilization -> Decoder`):
+
+| flags | decoder util | playback |
+|---|---|---|
+| default | 0.0 % | no decoder available (build has no software HEVC) |
+| `--enable-features=VaapiVideoDecoder,VaapiIgnoreDriverChecks` | **3.2-6.3 %** | HEVC plays, VPU active |
+
+So on Linux the VA-API decoder is gated behind those two features; the
+`mtgpu-chromium` launcher/desktop entry must pass them for HEVC to work.
