@@ -65,6 +65,18 @@ EDR（`CHROME_EDR_DEBUG=1`）：
 
 KWin 侧（mtgpu-kde 补丁）在 100% 与 40% 亮度下都保持 `tonemap=1 maxWhite=1000 maxOut=500`。
 
+## 验证截图
+
+![四段亮度条在 40% 亮度下的播放截图](docs/video-4band-40pct.png)
+
+上图是 `hdr-bars.mp4`（四段 100 / 203 / 500 / 1000 nit，HEVC Main10 PQ）在 **40% 亮度**下的实际播放截图，
+用于验证 **BT.2390 亮度滚降映射**：1000 nit 档没有在 500 nit 处被一刀切，而是经 EETF 压缩到面板峰值，
+观感接近 **TrueBlack HDR500**。
+
+注意：截图经过 `spectacle` 的 SDR 抓取路径，高光会被再压缩一次，**只能证明"存在滚降"，不能当亮度计**；
+实际观感比截图更接近 HDR。素材与探测脚本见
+[mtgpu-kde/tools/chromium-hdr](https://github.com/yeungtuzi/mtgpu-kde/tree/main/tools/chromium-hdr)。
+
 ## 已知限制
 
 - **HDR 视频亮度仍会部分跟随亮度条**：100% 时 SDR 白到达面板峰值，500 nit 高光与白点重合，
