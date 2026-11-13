@@ -124,3 +124,24 @@ Also: HEVC demuxer patch, VA-API enabled by default with driver-check bypass,
 
 Known limitation: HDR brightness still partly follows the brightness slider;
 40-50 % is the recommended window for HDR viewing.
+
+## 2026-11-13 更新：EDR 已不依赖本项目的客户端补丁
+
+`mtgpu-kde` 新增了 KWin 侧改动（[`patches/kwin-6.8.2-edr-advertise-1000.patch`](https://github.com/yeungtuzi/mtgpu-kde/blob/main/patches/kwin-6.8.2-edr-advertise-1000.patch)）：
+把 `wp_image_description` 通告的 **HDR 最大值下限提升到 1000 nit**，由合成器把 1000 nit 内容按 BT.2390 压到 500 nit 面板。
+
+实测结果（同一台 AIBOOK）：
+
+| 浏览器 | VPU 硬解 | EDR |
+|---|---|---|
+| **预装 Google Chrome** | ✅ 默认 | ✅ |
+| **Brave 1.99.57（Chromium 157）** | ✅ 默认（2.8–6.0%） | ✅ |
+| 本项目编译的 mtgpu-chromium | ✅ | ✅ |
+
+证据：`EDRK shader tonemap=1 maxWhite=1003.2 maxOut=500.0 tf=2`。
+
+因此：
+- **只为 EDR 的话，不再需要自己编译 Chromium**，装 `mtgpu-kde` 即可；
+- 本项目的价值集中在 **去 Google（ungoogled）与完全可控**；
+- ungoogled 版本的全量构建**已中止**（2026-11-13，`[9837/57801]`，0 错误），需要时可按 `chromium-hdr/TOOLCHAIN.md` 的官方参数重建。
+
