@@ -1,12 +1,44 @@
 # mtgpu-chromium
 
-> ⚠️ **必须与 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 配合使用。**
-> EDR/HDR 依赖 `mtgpu-kde` 提供的 KWin 覆盖包（参考白策略、固定 1000 nit 客户端目标、BT.2390 滚降 LUT），
-> 只装本项目的 Chromium 不会得到 EDR 效果。
+> ⚠️ **EDR 由 [mtgpu-kde](https://github.com/yeungtuzi/mtgpu-kde) 提供，本项目已非必需。**
+> 升级 `mtgpu-kde` 到 **6.8.2-mtgpu4** 及以上，预装 Chrome / Brave 即可获得 EDR 与 VPU 硬解；
+> 本项目保留的是"去 Google / 完全可控"的浏览器与构建资料。
 >
 > ⚠️ **仅在 AIBOOK 上验证**（MTT M1000 + OLED 面板 + KWin Wayland）。其他机型/面板未测试，
 > 硬解与 EDR 行为可能不同（LCD 需要额外的背光 boost/恢复逻辑）。
 
+
+
+## 项目状态：阶段性成果（2026-11-13）
+
+**目标已达成，结论已沉淀到 mtgpu-kde。如果你只是想要 VPU 硬解 + EDR，不再需要本项目。**
+
+| 你的目的 | 该怎么做 |
+|---|---|
+| 只要 VPU 硬解 + EDR | **升级 mtgpu-kde 到 6.8.2-mtgpu4+** 即可；实测预装 Google Chrome、Brave 均直接支持，无需改浏览器 |
+| 要"去 Google"的浏览器 | 继续用本项目的二进制（`/opt/mtgpu-chromium`，Release `v157.0.8103.38`）或按 `chromium-hdr/TOOLCHAIN.md` 自建 |
+| 要调试/改 Chromium | 用本仓库的构建资料与补丁 |
+
+**本项目仍然可用的产出**：
+
+- 二进制：`/opt/mtgpu-chromium`（Chromium 157.0.8103.38，标准版）+ [Release v157.0.8103.38](https://github.com/yeungtuzi/mtgpu-chromium/releases/tag/v157.0.8103.38)
+- 工具链：`mtgpu-clang`（clang 24）、`mtgpu-rust`（rustc 1.100-nightly + bindgen + crubit，aarch64）
+- 构建与验证资料：`chromium-hdr/`（TOOLCHAIN、EDR-VERIFICATION、测试视频、VPU/EDR 探针、打包脚本）
+
+**为什么现在不再需要它**：EDR 的关键一步改到了合成器侧——KWin 把通告给客户端的 HDR 最大值下限抬到 1000 nit
+（`mtgpu-kde` 的 `kwin-6.8.2-edr-advertise-1000.patch`），Chromium 系客户端据此请求 1000 nit，KWin 再用 BT.2390 压回 500 nit 面板。
+客户端不再需要任何补丁，因此 Chrome / Brave / Edge 等全部受益。
+
+**历史成果**（本项目完成的部分）：
+
+- 验证了 M1000 VPU 对 H.264 / HEVC / VP9 / AV1 的硬解，以及 HEVC demuxer 补丁的必要性；
+- 实现并在 Chromium 内验证了 BT.2390 EETF（129 点 PQ LUT）与 EDR 头空间计算；
+- 打通了 aarch64 上的 Chromium 完整构建链（clang 24 / rustc nightly / Qt6 / sysroot）；
+- 产出了可复用的 EDR/VPU 探针与合成测试视频，现放在 `chromium-hdr/`。
+
+**未完成的部分**：ungoogled（去 Google）全量构建于 2026-11-13 中止（`[9837/57801]`，0 错误），
+原因见 `chromium-hdr/TOOLCHAIN.md`：需要先合并 ungoogled 的 `flags.gn`（`safe_browsing_mode=0` 等），
+再叠加 `is_official_build + PGO + ThinLTO`。需要时可按文档重建。
 
 在 AIBOOK（MTT M1000 / aarch64 / KWin Wayland）上从源码构建的 **Chromium 157.0.8103.38**，
 针对 mtgpu 的硬件解码与 EDR（增强动态范围）做了验证和补强。
@@ -125,7 +157,7 @@ Also: HEVC demuxer patch, VA-API enabled by default with driver-check bypass,
 Known limitation: HDR brightness still partly follows the brightness slider;
 40-50 % is the recommended window for HDR viewing.
 
-## 2026-11-13 更新：EDR 已不依赖本项目的客户端补丁
+## 附：EDR 免重编的验证记录（2026-11-13）
 
 `mtgpu-kde` 新增了 KWin 侧改动（[`patches/kwin-6.8.2-edr-advertise-1000.patch`](https://github.com/yeungtuzi/mtgpu-kde/blob/main/patches/kwin-6.8.2-edr-advertise-1000.patch)）：
 把 `wp_image_description` 通告的 **HDR 最大值下限提升到 1000 nit**，由合成器把 1000 nit 内容按 BT.2390 压到 500 nit 面板。
